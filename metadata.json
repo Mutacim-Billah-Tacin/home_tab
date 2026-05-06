@@ -1,0 +1,12 @@
+{
+  "name": "Orbit Dashboard",
+  "description": "A highly interactive and customizable browser homepage featuring a bento-grid layout, productivity tools, and a built-in Gemini AI assistant.",
+  "requestFramePermissions": [
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "AI-powered assistant",
+    "Productivity widgets",
+    "Dynamic backgrounds"
+  ]
+}

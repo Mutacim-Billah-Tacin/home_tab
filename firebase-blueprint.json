@@ -1,0 +1,100 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Information about the registered user.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "createdAt"]
+    },
+    "Bookmark": {
+      "title": "Bookmark",
+      "description": "User's quick links and shortcuts.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "url": { "type": "string" },
+        "icon": { "type": "string" },
+        "category": { "type": "string" },
+        "userId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "url", "userId", "createdAt"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "Productivity task items.",
+      "type": "object",
+      "properties": {
+        "text": { "type": "string" },
+        "completed": { "type": "boolean" },
+        "category": { "type": "string" },
+        "userId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["text", "completed", "userId", "createdAt"]
+    },
+    "Note": {
+      "title": "Note",
+      "description": "Quick notes saved by the user.",
+      "type": "object",
+      "properties": {
+        "content": { "type": "string" },
+        "userId": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["content", "userId", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "User",
+      "description": "User profiles."
+    },
+    "bookmarks": {
+      "schema": "Bookmark",
+      "description": "Collection of bookmarks."
+    },
+    "categories": {
+      "schema": {
+        "title": "Category",
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "userId": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        },
+        "required": ["name", "userId", "createdAt"]
+      },
+      "description": "Collection of shortcut categories."
+    },
+    "alarms": {
+      "schema": {
+        "title": "Alarm",
+        "type": "object",
+        "properties": {
+          "time": { "type": "string" },
+          "label": { "type": "string" },
+          "enabled": { "type": "boolean" },
+          "userId": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        },
+        "required": ["time", "label", "enabled", "userId", "createdAt"]
+      },
+      "description": "Collection of user alarms."
+    },
+    "tasks": {
+      "schema": "Task",
+      "description": "Collection of tasks."
+    },
+    "notes": {
+      "schema": "Note",
+      "description": "Collection of notes."
+    }
+  }
+}

@@ -1,0 +1,151 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Validation Helpers ---
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['email', 'createdAt']) &&
+             data.keys().size() <= 12 &&
+             data.email is string &&
+             (data.keys().contains('displayName') ? data.displayName is string : true) &&
+             (data.keys().contains('photoURL') ? data.photoURL is string : true) &&
+             (data.keys().contains('lastWallpaper') ? data.lastWallpaper is string : true) &&
+             (data.keys().contains('updatedAt') ? data.updatedAt is timestamp : true) &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidBookmark(data) {
+      return data.keys().hasAll(['title', 'url', 'userId', 'createdAt']) &&
+             data.title is string && data.title.size() <= 1000 &&
+             data.url is string && data.url.size() <= 4000 &&
+             data.userId == request.auth.uid &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidTask(data) {
+      return data.keys().hasAll(['text', 'completed', 'userId', 'createdAt']) &&
+             data.keys().size() <= 12 &&
+             data.text is string && data.text.size() <= 1024 &&
+             data.completed is bool &&
+             (data.keys().contains('category') ? data.category is string && data.category.size() <= 128 : true) &&
+             data.userId == request.auth.uid &&
+             (data.createdAt == request.time || data.createdAt is timestamp);
+    }
+
+    function isValidNote(data) {
+      return data.keys().hasAll(['content', 'userId', 'updatedAt']) &&
+             data.keys().size() <= 10 &&
+             data.content is string && data.content.size() <= 20000 &&
+             data.userId == request.auth.uid &&
+             (data.updatedAt == request.time || data.updatedAt is timestamp);
+    }
+
+    function isValidCategory(data) {
+      return data.keys().hasAll(['name', 'userId', 'createdAt']) &&
+             data.keys().size() <= 8 &&
+             data.name is string && data.name.size() <= 64 &&
+             data.userId == request.auth.uid &&
+             (data.createdAt == request.time || data.createdAt is timestamp);
+    }
+
+    function isValidAlarm(data) {
+      return data.keys().hasAll(['time', 'label', 'enabled', 'userId', 'createdAt']) &&
+             data.keys().size() <= 10 &&
+             data.time is string && data.time.size() <= 8 &&
+             data.label is string && data.label.size() <= 128 &&
+             data.enabled is bool &&
+             data.userId == request.auth.uid &&
+             (data.createdAt == request.time || data.createdAt is timestamp);
+    }
+
+    // --- Collection Rules ---
+
+    match /categories/{categoryId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidCategory(incoming());
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    match /alarms/{alarmId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidAlarm(incoming());
+      allow update: if isSignedIn() && 
+                      resource.data.userId == request.auth.uid && 
+                      incoming().userId == request.auth.uid &&
+                      incoming().diff(existing()).affectedKeys().hasOnly(['enabled', 'time', 'label']);
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(incoming());
+      allow update: if isOwner(userId) && 
+                      (
+                        incoming().diff(existing()).affectedKeys().hasOnly(['email', 'displayName', 'photoURL', 'lastWallpaper', 'updatedAt']) ||
+                        incoming().diff(existing()).affectedKeys().hasOnly(['lastWallpaper', 'updatedAt'])
+                      ) &&
+                      (incoming().keys().contains('updatedAt') ? incoming().updatedAt == request.time : true);
+    }
+
+    match /bookmarks/{bookmarkId} {
+      allow get: if isSignedIn() && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidBookmark(incoming());
+      allow update: if isSignedIn() && 
+                      existing().userId == request.auth.uid &&
+                      incoming().userId == request.auth.uid &&
+                      isValidBookmark(incoming()) &&
+                      incoming().diff(existing()).affectedKeys().hasOnly(['title', 'url', 'icon', 'category', 'createdAt']);
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+    }
+
+    match /tasks/{taskId} {
+      allow get: if isSignedIn() && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidTask(incoming());
+      allow update: if isSignedIn() && 
+                      existing().userId == request.auth.uid &&
+                      incoming().userId == request.auth.uid &&
+                      incoming().diff(existing()).affectedKeys().hasOnly(['text', 'completed', 'category', 'createdAt']);
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+    }
+
+    match /notes/{noteId} {
+      allow get: if isSignedIn() && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidNote(incoming()) && isValidId(noteId);
+      allow update: if isSignedIn() && 
+                      existing().userId == request.auth.uid &&
+                      incoming().userId == request.auth.uid &&
+                      incoming().diff(existing()).affectedKeys().hasOnly(['content', 'updatedAt']) &&
+                      incoming().updatedAt == request.time;
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+    }
+  }
+}
