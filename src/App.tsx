@@ -1205,7 +1205,7 @@ export default function App() {
             onChange={handleNoteChange}
             placeholder={user ? "Just start typing..." : "Login to save notes!"} 
             disabled={!user}
-            className="w-full bg-transparent border-none focus:ring-0 text-white/80 placeholder:text-white/20 resize-none h-28 leading-relaxed overflow-hidden"
+            className="w-full bg-transparent border-none focus:ring-0 text-white/80 placeholder:text-white/20 resize-none h-48 leading-relaxed"
           />
         </GlassCard>
 
