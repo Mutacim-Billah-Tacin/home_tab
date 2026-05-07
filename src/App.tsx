@@ -57,6 +57,16 @@ import {
 } from 'firebase/firestore';
 import type { Task, Note, Bookmark, Category, Alarm } from './types';
 
+// localStorage helpers for guest users (no login)
+const LOCAL_TASKS_KEY = 'orbit_local_tasks';
+const getLocalTasks = (): any[] => {
+  try { return JSON.parse(localStorage.getItem(LOCAL_TASKS_KEY) || '[]'); } catch { return []; }
+};
+const saveLocalTasks = (tasks: any[]) => {
+  try { localStorage.setItem(LOCAL_TASKS_KEY, JSON.stringify(tasks)); } catch {}
+};
+
+
 // Components
 const GlassCard = ({ children, className = "", title = "", delay = 0 }: { children: React.ReactNode, className?: string, title?: string, delay?: number }) => (
   <motion.div 
@@ -134,11 +144,10 @@ export default function App() {
 
   useEffect(() => {
     if (!user) {
-      // Load tasks from localStorage when not logged in
-      try {
-        const local = JSON.parse(localStorage.getItem('orbit_local_tasks') || '[]');
-        setTasks(local);
-      } catch { setTasks([]); }
+      // Don't wipe tasks while auth is still loading
+      if (authLoading) return;
+      // Load tasks from localStorage for guest users
+      setTasks(getLocalTasks());
       setBookmarks([]);
       setNote(null);
       return;
@@ -201,7 +210,7 @@ export default function App() {
       unsubCategories();
       unsubAlarms();
     };
-  }, [user]);
+  }, [user, authLoading]);
 
   const addCategory = useCallback(async () => {
     if (!user || !newCategoryName.trim()) return;
@@ -456,12 +465,7 @@ export default function App() {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Local task helpers (used when not logged in)
-  const LOCAL_TASKS_KEY = 'orbit_local_tasks';
-  const getLocalTasks = (): Task[] => {
-    try { return JSON.parse(localStorage.getItem(LOCAL_TASKS_KEY) || '[]'); } catch { return []; }
-  };
-  const saveLocalTasks = (t: Task[]) => localStorage.setItem(LOCAL_TASKS_KEY, JSON.stringify(t));
+
 
   const toggleTask = useCallback(async (id: string, completed: boolean) => {
     if (!user) {
