@@ -98,6 +98,7 @@ export default function App() {
   const [isAddingBookmark, setIsAddingBookmark] = useState(false);
   const [newBookmark, setNewBookmark] = useState({ title: '', url: '', category: 'General' });
   const [categories, setCategories] = useState<Category[]>([]);
+  const [newTaskText, setNewTaskText] = useState('');
   const [activeTab, setActiveTab] = useState('All');
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
@@ -482,13 +483,11 @@ export default function App() {
     }
   }, [user]);
 
-  const addTask = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const form = e.currentTarget;
-    const input = form.elements.taskName as HTMLInputElement;
-    if (!input.value.trim()) return;
-    const taskText = input.value.trim();
+  const handleAddTask = useCallback(async () => {
+    if (!newTaskText.trim()) return;
+    const taskText = newTaskText.trim();
     const taskCategory = activeTab === 'All' ? 'General' : activeTab;
+    setNewTaskText('');
 
     if (!user) {
       const newTask: Task = {
@@ -501,7 +500,6 @@ export default function App() {
       const updated = [newTask, ...getLocalTasks()];
       saveLocalTasks(updated);
       setTasks(updated);
-      form.reset();
       return;
     }
 
@@ -513,11 +511,10 @@ export default function App() {
         userId: user.uid,
         createdAt: serverTimestamp()
       });
-      form.reset();
     } catch (err) {
       handleFirestoreError(err, OperationType.CREATE, 'tasks');
     }
-  }, [user, activeTab]);
+  }, [user, activeTab, newTaskText]);
 
   const deleteTask = useCallback(async (id: string) => {
     if (!user) {
@@ -1116,19 +1113,22 @@ export default function App() {
 
           {/* Tasks Widget */}
           <GlassCard className="md:col-span-2 lg:col-span-2 row-span-2" title="Daily Tasks" delay={0.25}>
-            <form onSubmit={addTask} className="mb-4">
-              <div className="relative">
-                <input 
-                  name="taskName"
-                  type="text" 
-                  placeholder="Add task..." 
-                  className="w-full bg-black/20 border border-white/10 rounded-xl py-2 px-4 text-white text-sm focus:outline-none focus:ring-1 focus:ring-white/30"
-                />
-                <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-white/40 hover:text-white">
-                  <Plus className="w-4 h-4" />
-                </button>
-              </div>
-            </form>
+            <div className="relative mb-4">
+              <input
+                type="text"
+                value={newTaskText}
+                onChange={e => setNewTaskText(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleAddTask(); }}
+                placeholder="Add task..."
+                className="w-full bg-black/20 border border-white/10 rounded-xl py-2 px-4 text-white text-sm focus:outline-none focus:ring-1 focus:ring-white/30"
+              />
+              <button
+                onClick={handleAddTask}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-white/40 hover:text-white"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
             <div className="space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
               <AnimatePresence mode="popLayout">
                 {tasks.length === 0 && (
