@@ -134,7 +134,11 @@ export default function App() {
 
   useEffect(() => {
     if (!user) {
-      setTasks([]);
+      // Load tasks from localStorage when not logged in
+      try {
+        const local = JSON.parse(localStorage.getItem('orbit_local_tasks') || '[]');
+        setTasks(local);
+      } catch { setTasks([]); }
       setBookmarks([]);
       setNote(null);
       return;
@@ -262,26 +266,39 @@ export default function App() {
 
   const [firingAlarm, setFiringAlarm] = useState<{label: string, time: string} | null>(null);
   const alarmRepeatRef = useRef<NodeJS.Timeout | null>(null);
+  const alarmAudioRef = useRef<AudioBufferSourceNode | null>(null);
+  const alarmAudioCtxRef = useRef<AudioContext | null>(null);
 
+  // Classic digital alarm beep pattern: beep-beep-beep ... pause ... repeat
   const playAlarmSound = () => {
     try {
       const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      // Nice 3-note ascending chime: C5 -> E5 -> G5
-      const notes = [523.25, 659.25, 783.99];
-      notes.forEach((freq, i) => {
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.type = 'sine';
-        const t = audioCtx.currentTime + i * 0.22;
-        osc.frequency.setValueAtTime(freq, t);
-        gain.gain.setValueAtTime(0, t);
-        gain.gain.linearRampToValueAtTime(0.35, t + 0.05);
-        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
-        osc.start(t);
-        osc.stop(t + 0.55);
-      });
+      alarmAudioCtxRef.current = audioCtx;
+
+      // Beep pattern: 3 quick beeps then silence
+      // Each beep: 880Hz square wave, 0.12s on, 0.08s off
+      const beepCount = 3;
+      const beepOn = 0.12;
+      const beepOff = 0.08;
+      const groupGap = 0.5; // gap after 3 beeps before next group
+      const totalCycle = beepCount * (beepOn + beepOff) + groupGap; // ~1.1s per cycle
+
+      // Play 4 groups per call (covers ~4.4s, called every 4.5s = seamless repeat)
+      for (let g = 0; g < 4; g++) {
+        for (let b = 0; b < beepCount; b++) {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.type = 'square';
+          osc.frequency.value = 880;
+          const t = audioCtx.currentTime + g * totalCycle + b * (beepOn + beepOff);
+          gain.gain.setValueAtTime(0.18, t);
+          gain.gain.setValueAtTime(0, t + beepOn);
+          osc.start(t);
+          osc.stop(t + beepOn + 0.01);
+        }
+      }
     } catch (e) {
       console.error('Audio context error:', e);
     }
@@ -289,6 +306,12 @@ export default function App() {
 
   const dismissAlarm = () => {
     if (alarmRepeatRef.current) clearInterval(alarmRepeatRef.current);
+    alarmRepeatRef.current = null;
+    // Close audio context to immediately stop any playing sound
+    if (alarmAudioCtxRef.current) {
+      alarmAudioCtxRef.current.close();
+      alarmAudioCtxRef.current = null;
+    }
     setFiringAlarm(null);
   };
 
@@ -304,23 +327,26 @@ export default function App() {
         if (alarm.enabled && alarm.time === currentTimeStr && now.getSeconds() === 0) {
           setFiringAlarm({ label: alarm.label, time: alarm.time });
           playAlarmSound();
-          // Repeat every 4 seconds, up to 15 times (1 minute)
+
+          // Repeat every 4.5s for up to 5 minutes (300s / 4.5 ≈ 66 times)
           let count = 0;
           if (alarmRepeatRef.current) clearInterval(alarmRepeatRef.current);
           alarmRepeatRef.current = setInterval(() => {
             count++;
             playAlarmSound();
-            if (count >= 14) {
+            if (count >= 66) {
               if (alarmRepeatRef.current) clearInterval(alarmRepeatRef.current);
+              alarmRepeatRef.current = null;
               setFiringAlarm(null);
             }
-          }, 4000);
+          }, 4500);
 
           if ('Notification' in window) {
             if (Notification.permission === 'granted') {
-              new Notification(`Alarm: ${alarm.label}`, { 
-                body: `It's ${alarm.time}!`,
-                icon: '/favicon.ico'
+              new Notification(`⏰ Alarm: ${alarm.label}`, {
+                body: `It's ${alarm.time}! Tap to dismiss.`,
+                icon: '/favicon.ico',
+                requireInteraction: true,
               });
             } else if (Notification.permission !== 'denied') {
               Notification.requestPermission();
@@ -430,8 +456,20 @@ export default function App() {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Local task helpers (used when not logged in)
+  const LOCAL_TASKS_KEY = 'orbit_local_tasks';
+  const getLocalTasks = (): Task[] => {
+    try { return JSON.parse(localStorage.getItem(LOCAL_TASKS_KEY) || '[]'); } catch { return []; }
+  };
+  const saveLocalTasks = (t: Task[]) => localStorage.setItem(LOCAL_TASKS_KEY, JSON.stringify(t));
+
   const toggleTask = useCallback(async (id: string, completed: boolean) => {
-    if (!user) return;
+    if (!user) {
+      const updated = getLocalTasks().map(t => t.id === id ? { ...t, completed: !completed } : t);
+      saveLocalTasks(updated);
+      setTasks(updated);
+      return;
+    }
     try {
       await updateDoc(doc(db, 'tasks', id), { completed: !completed });
     } catch (err) {
@@ -441,14 +479,27 @@ export default function App() {
 
   const addTask = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!user) return;
     const form = e.currentTarget;
     const input = form.elements.taskName as HTMLInputElement;
     if (!input.value.trim()) return;
-    
     const taskText = input.value.trim();
     const taskCategory = activeTab === 'All' ? 'General' : activeTab;
-    
+
+    if (!user) {
+      const newTask: Task = {
+        id: `local_${Date.now()}`,
+        text: taskText,
+        completed: false,
+        category: taskCategory,
+        createdAt: new Date().toISOString(),
+      };
+      const updated = [newTask, ...getLocalTasks()];
+      saveLocalTasks(updated);
+      setTasks(updated);
+      form.reset();
+      return;
+    }
+
     try {
       await addDoc(collection(db, 'tasks'), {
         text: taskText,
@@ -464,7 +515,12 @@ export default function App() {
   }, [user, activeTab]);
 
   const deleteTask = useCallback(async (id: string) => {
-    if (!user) return;
+    if (!user) {
+      const updated = getLocalTasks().filter(t => t.id !== id);
+      saveLocalTasks(updated);
+      setTasks(updated);
+      return;
+    }
     try {
       await deleteDoc(doc(db, 'tasks', id));
     } catch (err) {
