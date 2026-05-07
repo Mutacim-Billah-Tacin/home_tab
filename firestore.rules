@@ -42,10 +42,10 @@ service cloud.firestore {
 
     function isValidBookmark(data) {
       return data.keys().hasAll(['title', 'url', 'userId', 'createdAt']) &&
-             data.title is string && data.title.size() <= 1000 &&
+             data.title is string && data.title.size() <= 256 &&
              data.url is string && data.url.size() <= 4000 &&
              data.userId == request.auth.uid &&
-             data.createdAt is timestamp;
+             data.createdAt == request.time;
     }
 
     function isValidTask(data) {
@@ -55,7 +55,7 @@ service cloud.firestore {
              data.completed is bool &&
              (data.keys().contains('category') ? data.category is string && data.category.size() <= 128 : true) &&
              data.userId == request.auth.uid &&
-             (data.createdAt == request.time || data.createdAt is timestamp);
+             data.createdAt == request.time;
     }
 
     function isValidNote(data) {
@@ -71,7 +71,7 @@ service cloud.firestore {
              data.keys().size() <= 8 &&
              data.name is string && data.name.size() <= 64 &&
              data.userId == request.auth.uid &&
-             (data.createdAt == request.time || data.createdAt is timestamp);
+             data.createdAt == request.time;
     }
 
     function isValidAlarm(data) {
@@ -81,20 +81,20 @@ service cloud.firestore {
              data.label is string && data.label.size() <= 128 &&
              data.enabled is bool &&
              data.userId == request.auth.uid &&
-             (data.createdAt == request.time || data.createdAt is timestamp);
+             data.createdAt == request.time;
     }
 
     // --- Collection Rules ---
 
     match /categories/{categoryId} {
       allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow create: if isSignedIn() && isValidCategory(incoming());
+      allow create: if isSignedIn() && isValidCategory(incoming()) && isValidId(categoryId);
       allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
     }
 
     match /alarms/{alarmId} {
       allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow create: if isSignedIn() && isValidAlarm(incoming());
+      allow create: if isSignedIn() && isValidAlarm(incoming()) && isValidId(alarmId);
       allow update: if isSignedIn() && 
                       resource.data.userId == request.auth.uid && 
                       incoming().userId == request.auth.uid &&
@@ -116,23 +116,23 @@ service cloud.firestore {
     match /bookmarks/{bookmarkId} {
       allow get: if isSignedIn() && existing().userId == request.auth.uid;
       allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow create: if isSignedIn() && isValidBookmark(incoming());
+      allow create: if isSignedIn() && isValidBookmark(incoming()) && isValidId(bookmarkId);
       allow update: if isSignedIn() && 
                       existing().userId == request.auth.uid &&
                       incoming().userId == request.auth.uid &&
                       isValidBookmark(incoming()) &&
-                      incoming().diff(existing()).affectedKeys().hasOnly(['title', 'url', 'icon', 'category', 'createdAt']);
+                      incoming().diff(existing()).affectedKeys().hasOnly(['title', 'url', 'icon', 'category']);
       allow delete: if isSignedIn() && existing().userId == request.auth.uid;
     }
 
     match /tasks/{taskId} {
       allow get: if isSignedIn() && existing().userId == request.auth.uid;
       allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow create: if isSignedIn() && isValidTask(incoming());
+      allow create: if isSignedIn() && isValidTask(incoming()) && isValidId(taskId);
       allow update: if isSignedIn() && 
                       existing().userId == request.auth.uid &&
                       incoming().userId == request.auth.uid &&
-                      incoming().diff(existing()).affectedKeys().hasOnly(['text', 'completed', 'category', 'createdAt']);
+                      incoming().diff(existing()).affectedKeys().hasOnly(['text', 'completed', 'category']);
       allow delete: if isSignedIn() && existing().userId == request.auth.uid;
     }
 
