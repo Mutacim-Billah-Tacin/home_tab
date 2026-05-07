@@ -260,28 +260,36 @@ export default function App() {
     }
   }, [user]);
 
+  const [firingAlarm, setFiringAlarm] = useState<{label: string, time: string} | null>(null);
+  const alarmRepeatRef = useRef<NodeJS.Timeout | null>(null);
+
   const playAlarmSound = () => {
     try {
       const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const oscillator = audioCtx.createOscillator();
-      const gainNode = audioCtx.createGain();
-
-      oscillator.connect(gainNode);
-      gainNode.connect(audioCtx.destination);
-
-      oscillator.type = 'square';
-      oscillator.frequency.setValueAtTime(440, audioCtx.currentTime);
-      oscillator.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.1);
-      oscillator.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.2);
-      
-      gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
-
-      oscillator.start(audioCtx.currentTime);
-      oscillator.stop(audioCtx.currentTime + 0.5);
+      // Nice 3-note ascending chime: C5 -> E5 -> G5
+      const notes = [523.25, 659.25, 783.99];
+      notes.forEach((freq, i) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.type = 'sine';
+        const t = audioCtx.currentTime + i * 0.22;
+        osc.frequency.setValueAtTime(freq, t);
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(0.35, t + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+        osc.start(t);
+        osc.stop(t + 0.55);
+      });
     } catch (e) {
       console.error('Audio context error:', e);
     }
+  };
+
+  const dismissAlarm = () => {
+    if (alarmRepeatRef.current) clearInterval(alarmRepeatRef.current);
+    setFiringAlarm(null);
   };
 
   // Alarm check effect
@@ -294,8 +302,20 @@ export default function App() {
 
       alarms.forEach(alarm => {
         if (alarm.enabled && alarm.time === currentTimeStr && now.getSeconds() === 0) {
+          setFiringAlarm({ label: alarm.label, time: alarm.time });
           playAlarmSound();
-          
+          // Repeat every 4 seconds, up to 15 times (1 minute)
+          let count = 0;
+          if (alarmRepeatRef.current) clearInterval(alarmRepeatRef.current);
+          alarmRepeatRef.current = setInterval(() => {
+            count++;
+            playAlarmSound();
+            if (count >= 14) {
+              if (alarmRepeatRef.current) clearInterval(alarmRepeatRef.current);
+              setFiringAlarm(null);
+            }
+          }, 4000);
+
           if ('Notification' in window) {
             if (Notification.permission === 'granted') {
               new Notification(`Alarm: ${alarm.label}`, { 
@@ -586,6 +606,31 @@ export default function App() {
       {/* Overlay for better readability */}
       <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" />
       
+      {/* Alarm Firing Popup */}
+      <AnimatePresence>
+        {firingAlarm && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            className="fixed inset-0 z-[9999] flex items-center justify-center"
+          >
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+            <div className="relative bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl p-10 flex flex-col items-center gap-6 shadow-2xl min-w-[300px]">
+              <div className="text-6xl animate-bounce">⏰</div>
+              <div className="text-white text-4xl font-bold tracking-widest">{firingAlarm.time}</div>
+              <div className="text-white/80 text-xl font-medium">{firingAlarm.label}</div>
+              <button
+                onClick={dismissAlarm}
+                className="mt-2 px-10 py-3 bg-white text-black font-bold rounded-full text-lg hover:bg-white/90 active:scale-95 transition-all"
+              >
+                Dismiss
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Wallpaper Loading State */}
       <AnimatePresence>
         {isWallpaperLoading && (
