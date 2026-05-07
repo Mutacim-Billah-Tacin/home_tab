@@ -90,7 +90,7 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [bgImage, setBgImage] = useState('https://images.unsplash.com/photo-1477346611705-65d1883cee1e?auto=format&fit=crop&q=80&w=2070');
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [tasks, setTasks] = useState<Task[]>(() => getLocalTasks());
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [note, setNote] = useState<Note | null>(null);
   const [isAiOpen, setIsAiOpen] = useState(false);
@@ -144,14 +144,15 @@ export default function App() {
 
   useEffect(() => {
     if (!user) {
-      // Don't wipe tasks while auth is still loading
-      if (authLoading) return;
-      // Load tasks from localStorage for guest users
-      setTasks(getLocalTasks());
+      if (authLoading) return; // wait for auth to resolve before doing anything
+      // User is not logged in — tasks already loaded from localStorage via useState init.
+      // Just clear cloud-only data.
       setBookmarks([]);
       setNote(null);
       return;
     }
+    // User is logged in — Firebase will sync tasks, so we don't need local ones.
+    // Do NOT delete localStorage here in case auth flickers.
 
     // Tasks Sync
     const taskQuery = query(collection(db, 'tasks'), where('userId', '==', user.uid), orderBy('createdAt', 'desc'));
