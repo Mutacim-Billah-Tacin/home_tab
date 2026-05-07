@@ -125,7 +125,6 @@ service cloud.firestore {
 - ✅ Tasks / To-Do list (localStorage for guests, Firebase for logged-in users)
 - 📝 Quick Notes (synced via Firebase when logged in)
 - ⏰ Alarms with classic beep sound, repeats for 5 minutes, dismiss anytime
-- 🍅 Pomodoro timer
 - 🤖 Orbit AI — Gemini-powered assistant
 - 🖼️ Dynamic wallpapers from Unsplash
 - 🔐 Google Sign-In (optional, enables cloud sync across devices)
