@@ -487,7 +487,7 @@ export default function App() {
   const handleAddTask = useCallback(async () => {
     if (!newTaskText.trim()) return;
     const taskText = newTaskText.trim();
-    const taskCategory = activeTab === 'All' ? 'General' : activeTab;
+    const taskCategory = 'General';
     setNewTaskText('');
 
     if (!user) {
@@ -515,7 +515,7 @@ export default function App() {
     } catch (err) {
       handleFirestoreError(err, OperationType.CREATE, 'tasks');
     }
-  }, [user, activeTab, newTaskText]);
+  }, [user, newTaskText]);
 
   const deleteTask = useCallback(async (id: string) => {
     if (!user) {
@@ -1142,7 +1142,6 @@ export default function App() {
                   </motion.p>
                 )}
                 {tasks
-                  .filter(t => activeTab === 'All' || t.category === activeTab || (!t.category && activeTab === 'General'))
                   .map((task, index) => (
                   <motion.div 
                     layout
