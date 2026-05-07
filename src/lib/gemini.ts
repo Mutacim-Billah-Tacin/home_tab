@@ -6,14 +6,16 @@ export async function askGemini(prompt: string): Promise<string> {
       body: JSON.stringify({ prompt }),
     });
 
+    const data = await response.json();
+
     if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
+      console.error("Gemini API Error:", data.error);
+      return `Error: ${data.error || "Unknown error from Gemini API"}`;
     }
 
-    const data = await response.json();
     return data.text || "I'm not sure how to answer that.";
   } catch (error) {
-    console.error("Gemini API Error:", error);
+    console.error("Gemini fetch failed:", error);
     return "I'm sorry, I'm having trouble connecting to my brain right now.";
   }
 }

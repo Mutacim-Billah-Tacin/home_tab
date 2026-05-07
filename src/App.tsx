@@ -26,7 +26,8 @@ import {
   Image as ImageIcon,
   AlarmClock,
   Bell,
-  BellOff
+  BellOff,
+  ArrowUp
 } from 'lucide-react';
 import { askGemini } from './lib/gemini';
 import { 
@@ -1391,7 +1392,7 @@ export default function App() {
                     type="submit"
                     className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-white rounded-xl flex items-center justify-center text-black shadow-lg hover:scale-105 disabled:opacity-50 disabled:scale-100 transition-all"
                   >
-                    <Plus className="w-5 h-5 rotate-45" />
+                    <ArrowUp className="w-5 h-5" />
                   </button>
                 </div>
               </form>

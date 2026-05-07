@@ -1,17 +1,27 @@
 export const onRequestPost = async (context: any) => {
-  const { prompt } = await context.request.json();
+  const apiKey = context.env.GEMINI_API_KEY;
 
-  if (!prompt) {
-    return new Response(JSON.stringify({ error: "No prompt provided" }), {
+  if (!apiKey) {
+    return new Response(JSON.stringify({ error: "GEMINI_API_KEY not set in Cloudflare environment variables" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  let prompt: string;
+  try {
+    const body = await context.request.json();
+    prompt = body.prompt;
+  } catch {
+    return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
       status: 400,
       headers: { "Content-Type": "application/json" },
     });
   }
 
-  const apiKey = context.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    return new Response(JSON.stringify({ error: "Gemini API key not configured" }), {
-      status: 500,
+  if (!prompt) {
+    return new Response(JSON.stringify({ error: "No prompt provided" }), {
+      status: 400,
       headers: { "Content-Type": "application/json" },
     });
   }
@@ -31,25 +41,21 @@ export const onRequestPost = async (context: any) => {
       }
     );
 
+    const data: any = await response.json();
+
     if (!response.ok) {
-      const err = await response.text();
-      return new Response(JSON.stringify({ error: err }), {
+      return new Response(JSON.stringify({ error: data?.error?.message || "Gemini API error" }), {
         status: response.status,
         headers: { "Content-Type": "application/json" },
       });
     }
 
-    const data: any = await response.json();
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "I'm not sure how to answer that.";
-
     return new Response(JSON.stringify({ text }), {
-      headers: {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
-      },
+      headers: { "Content-Type": "application/json" },
     });
   } catch (error: any) {
-    return new Response(JSON.stringify({ error: "Failed to contact Gemini API" }), {
+    return new Response(JSON.stringify({ error: error.message || "Failed to contact Gemini API" }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
     });
