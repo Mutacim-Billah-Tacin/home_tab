@@ -43,7 +43,7 @@ Click **Save and Deploy** — your site will be live at `your-project.pages.dev`
 After deploy, Google Login will be blocked unless you whitelist your domain.
 
 1. Go to https://console.firebase.google.com
-2. Select your project (the one matching `firebase-applet-config.json`)
+2. Select your Firebase project
 3. Click **Authentication** → **Settings** tab
 4. Scroll to **Authorized domains**
 5. Click **Add domain** and add:
@@ -53,17 +53,82 @@ After deploy, Google Login will be blocked unless you whitelist your domain.
 
 ---
 
+### Step 5 — Set Firestore Security Rules
+1. Go to https://console.firebase.google.com
+2. Select your Firebase project
+3. Click **Firestore Database** → **Rules** tab
+4. Replace everything with the rules below and click **Publish**
+
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOwner() {
+      return request.auth != null && request.auth.uid == resource.data.userId;
+    }
+    function isAuth() {
+      return request.auth != null;
+    }
+    function isMyData() {
+      return request.auth != null && request.resource.data.userId == request.auth.uid;
+    }
+
+    match /tasks/{id} {
+      allow read: if isOwner();
+      allow create: if isMyData();
+      allow update: if isOwner() && isMyData();
+      allow delete: if isOwner();
+    }
+
+    match /bookmarks/{id} {
+      allow read: if isOwner();
+      allow create: if isMyData();
+      allow update: if isOwner() && isMyData();
+      allow delete: if isOwner();
+    }
+
+    match /notes/{id} {
+      allow read: if isOwner();
+      allow create: if isMyData();
+      allow update: if isOwner() && isMyData();
+      allow delete: if isOwner();
+    }
+
+    match /categories/{id} {
+      allow read: if isOwner();
+      allow create: if isMyData();
+      allow update: if isOwner() && isMyData();
+      allow delete: if isOwner();
+    }
+
+    match /alarms/{id} {
+      allow read: if isOwner();
+      allow create: if isMyData();
+      allow update: if isOwner() && isMyData();
+      allow delete: if isOwner();
+    }
+
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}
+```
+
+---
+
 ## ✨ Features
 
 - 🔍 Google Search with autocomplete suggestions
-- 🔖 Bookmarks with categories (synced via Firebase)
-- ✅ Tasks / To-Do list (synced via Firebase)
-- 📝 Quick Notes (synced via Firebase)
-- ⏰ Alarms with sound & browser notifications
+- 🔖 Bookmarks with categories (synced via Firebase when logged in)
+- ✅ Tasks / To-Do list (localStorage for guests, Firebase for logged-in users)
+- 📝 Quick Notes (synced via Firebase when logged in)
+- ⏰ Alarms with classic beep sound, repeats for 5 minutes, dismiss anytime
 - 🍅 Pomodoro timer
 - 🤖 Orbit AI — Gemini-powered assistant
 - 🖼️ Dynamic wallpapers from Unsplash
-- 🔐 Google Sign-In (optional, for cloud sync)
+- 🔐 Google Sign-In (optional, enables cloud sync across devices)
 
 ---
 
@@ -112,3 +177,11 @@ npm run dev
 - **Gemini AI** — AI assistant via Cloudflare serverless function
 - **Framer Motion** — animations
 - **Cloudflare Pages** — hosting + serverless functions
+
+---
+
+## ⚠️ Notes
+
+- Tasks work without login (saved to browser localStorage)
+- Logging in syncs tasks, bookmarks, notes, and alarms to Firebase across all your devices
+- Favicon 404 errors in the console for bookmarks with fake URLs are harmless
